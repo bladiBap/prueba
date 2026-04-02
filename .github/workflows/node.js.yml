@@ -30,3 +30,28 @@ jobs:
           tags: |
             bladibap/catering_produccion:${{ github.ref_name }}
             bladibap/catering_produccion:sha-${{ github.sha }}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Provision Droplet and deploy container
+        run: |
+          doctl compute droplet create "catering-${{ github.ref_name }}" \
+            --region nyc1 \
+            --size s-1vcpu-1gb \
+            --image docker-20-04 \
+            --user-data "
+              #!/bin/bash
+              docker pull bladibap/catering_produccion:${{ github.ref_name }}
+              docker run -d -p 3000:3000 --name catering-app bladibap/catering_produccion:${{ github.ref_name }}
+            " \
+            --wait
